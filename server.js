@@ -1,0 +1,183 @@
+// server.js
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const path = require('path');
+const app = express();
+
+// hard-coded admin
+const ADMIN = { username: 'admin', password: 'admin123' };
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Connect MongoDB Atlas
+mongoose.connect(
+  'mongodb+srv://admin:admin123@website-db.m8nmnba.mongodb.net/?retryWrites=true&w=majority&appName=website-db',
+  { useNewUrlParser: true, useUnifiedTopology: true }
+);
+
+// Models
+const Kategori = require('./models/kategori');
+const Produk   = require('./models/produk');
+const Supplier = require('./models/supplier');
+const Penjualan       = require('./models/penjualan');
+const DetailPenjualan = require('./models/detailPenjualan');
+const Pembelian          = require('./models/pembelian');
+const DetailPembelian    = require('./models/detailPembelian');
+
+
+
+// Auth middleware
+function checkAuth(req, res, next) {
+  const token = req.headers['x-admin-token'];
+  if (token === 'secret-token') return next();
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+// --- ROUTES ---
+
+// Login
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === ADMIN.username && password === ADMIN.password) {
+    return res.json({ success: true, token: 'secret-token' });
+  }
+  res.status(401).json({ success: false });
+});
+
+// CRUD Kategori
+app.get('/api/kategori', checkAuth, async (req, res) => {
+  res.json(await Kategori.find());
+});
+app.post('/api/kategori', checkAuth, async (req, res) => {
+  const kat = new Kategori(req.body);
+  await kat.save();
+  res.json(kat);
+});
+app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
+  await Kategori.findByIdAndDelete(req.params.id);
+  res.sendStatus(204);
+});
+
+// CRUD Produk
+app.get('/api/produk', checkAuth, async (req, res) => {
+  res.json(await Produk.find().populate('kategori'));
+});
+app.post('/api/produk', checkAuth, async (req, res) => {
+  const p = new Produk(req.body);
+  await p.save();
+  res.json(p);
+});
+app.delete('/api/produk/:id', checkAuth, async (req, res) => {
+  await Produk.findByIdAndDelete(req.params.id);
+  res.sendStatus(204);
+});
+
+// --- CRUD Supplier ---
+app.get ('/api/supplier',    checkAuth, async (req, res) => {
+  res.json(await Supplier.find());
+});
+app.post('/api/supplier',    checkAuth, async (req, res) => {
+  const s = new Supplier(req.body);
+  await s.save();
+  res.json(s);
+});
+app.delete('/api/supplier/:id', checkAuth, async (req, res) => {
+  await Supplier.findByIdAndDelete(req.params.id);
+  res.sendStatus(204);
+});
+
+// — Transaksi Penjualan —
+app.post('/api/penjualan', checkAuth, async (req, res) => {
+  const { pembeli, items } = req.body;
+  // buat header penjualan
+  let penjualan = new Penjualan({ pembeli, totalHarga: 0 });
+  await penjualan.save();
+
+  let grandTotal = 0;
+  for (let it of items) {
+    const prod = await Produk.findById(it.produk);
+    if (!prod) continue;
+    const sub = prod.harga * it.jumlah;
+    grandTotal += sub;
+
+    // kurangi stok
+    prod.stok = prod.stok - it.jumlah;
+    await prod.save();
+
+    // simpan detail
+    await new DetailPenjualan({
+      penjualan: penjualan._id,
+      produk:    it.produk,
+      jumlah:    it.jumlah,
+      jenisPembayaran: it.jenisPembayaran,
+      totalHarga: sub
+    }).save();
+  }
+
+  // update totalHarga di header
+  penjualan.totalHarga = grandTotal;
+  await penjualan.save();
+
+  res.json({ success: true, penjualanId: penjualan._id });
+});
+
+app.get('/api/penjualan', checkAuth, async (req, res) => {
+  const list = await Penjualan.find().sort('-tanggal');
+  res.json(list);
+});
+
+// — Transaksi Pembelian —
+app.post('/api/pembelian', checkAuth, async (req, res) => {
+  const { supplierId, items } = req.body;
+  // Header pembelian
+  let pemb = new Pembelian({ supplier: supplierId, totalHarga: 0 });
+  await pemb.save();
+
+  let grandTotal = 0;
+  for (let it of items) {
+    const prod = await Produk.findById(it.produk);
+    if (!prod) continue;
+    const sub = it.hargaBeliSatuan * it.jumlah;
+    grandTotal += sub;
+
+    // tambah stok
+    prod.stok = prod.stok + it.jumlah;
+    await prod.save();
+
+    // simpan detail
+    await new DetailPembelian({
+      pembelian:       pemb._id,
+      produk:          it.produk,
+      jumlah:          it.jumlah,
+      hargaBeliSatuan: it.hargaBeliSatuan,
+      subtotal:        sub
+    }).save();
+  }
+
+  // update totalHarga
+  pemb.totalHarga = grandTotal;
+  await pemb.save();
+
+  res.json({ success: true, pembelianId: pemb._id });
+});
+
+app.get('/api/pembelian', checkAuth, async (req, res) => {
+  const list = await Pembelian.find()
+    .populate('supplier')
+    .sort('-tanggal');
+  res.json(list);
+});
+
+// Alert stok menipis
+app.get('/api/low-stock', checkAuth, async (req, res) => {
+  const list = await Produk.find({ stok: { $lte: '$stokMinimum' } });
+  res.json(list);
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server di http://localhost:${PORT}`));

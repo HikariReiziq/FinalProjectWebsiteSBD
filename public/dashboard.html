@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <h1>Dashboard</h1>
+  <div id="low-stock-alert"></div>
+  <h2>Kelola Kategori</h2>
+  <input id="new-kat" placeholder="Nama kategori"/><button onclick="addKategori()">Tambah</button>
+  <ul id="list-kat"></ul>
+
+  <h2>Kelola Produk</h2>
+  <input id="p-nama" placeholder="Nama produk"/>
+  <input id="p-stok" type="number" placeholder="Stok"/>
+  <input id="p-harga" type="number" placeholder="Harga"/>
+  <select id="p-kat"></select>
+  <button onclick="addProduk()">Tambah</button>
+  <ul id="list-produk"></ul>
+
+  <h2>Kelola Supplier</h2>
+    <input id="new-supplier-nama" placeholder="Nama supplier"/>
+    <input id="new-supplier-alamat" placeholder="Alamat"/><br/>
+    <input id="new-supplier-kontak" placeholder="Kontak"/><button onclick="addSupplier()">Tambah</button>
+    <ul id="list-supplier"></ul>
+
+    <hr/>
+<h2>Transaksi Penjualan</h2>
+
+<label>Nama Pembeli:</label>
+<input id="pembeli" placeholder="Masukkan nama"/>
+
+<label>Jenis Bayar:</label>
+<select id="jenispembayaran">
+  <option>Cash</option>
+  <option>Credit</option>
+</select>
+
+<hr/>
+<label>Pilih Produk & Jumlah:</label><br/>
+<select id="tx-produk"></select>
+<input id="tx-jumlah" type="number" placeholder="Jumlah"/>
+<button onclick="addItem()">Tambah Item</button>
+
+<ul id="list-items"></ul>
+<button onclick="submitTransaksi()">Submit Transaksi</button>
+
+<hr/>
+<h3>Riwayat Penjualan</h3>
+<ul id="list-penjualan"></ul>
+
+<hr/>
+<h2>Transaksi Pembelian</h2>
+
+<label>Supplier:</label>
+<select id="tx-supplier"></select>
+
+<hr/>
+<label>Pilih Produk & Jumlah & Harga Beli:</label><br/>
+<select id="txp-produk"></select>
+<input id="txp-jumlah" type="number" placeholder="Jumlah"/>
+<input id="txp-harga" type="number" placeholder="Harga Beli per Satuan"/>
+<button onclick="addItemPembelian()">Tambah Item</button>
+
+<ul id="list-items-pembelian"></ul>
+<button onclick="submitPembelian()">Submit Pembelian</button>
+
+<hr/>
+<h3>Riwayat Pembelian</h3>
+<ul id="list-pembelian"></ul>
+
+
+  <script src="app.js"></script>
+</body>
+</html>
