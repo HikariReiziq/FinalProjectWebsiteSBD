@@ -172,9 +172,11 @@ app.get('/api/pembelian', checkAuth, async (req, res) => {
   res.json(list);
 });
 
-// Alert stok menipis
+// Alert stok menipis (perbaikan)
 app.get('/api/low-stock', checkAuth, async (req, res) => {
-  const list = await Produk.find({ stok: { $lte: '$stokMinimum' } });
+  const list = await Produk.find({
+    $expr: { $lte: ['$stok', '$stokMinimum'] }
+  });
   res.json(list);
 });
 
