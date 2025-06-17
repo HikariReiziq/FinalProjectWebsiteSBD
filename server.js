@@ -27,8 +27,17 @@ const Penjualan       = require('./models/penjualan');
 const DetailPenjualan = require('./models/detailPenjualan');
 const Pembelian          = require('./models/pembelian');
 const DetailPembelian    = require('./models/detailPembelian');
+const Trash = require('./models/trash');
 
-
+// Helper untuk memindahkan dokumen ke Trash
+async function moveToTrash(collectionName, doc) {
+  const t = new Trash({
+    originalId:     doc._id,
+    collectionName,
+    data:           doc.toObject()
+  });
+  await t.save();
+}
 
 // Auth middleware
 function checkAuth(req, res, next) {
@@ -58,7 +67,12 @@ app.post('/api/kategori', checkAuth, async (req, res) => {
   res.json(kat);
 });
 app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
-  await Kategori.findByIdAndDelete(req.params.id);
+  const kat = await Kategori.findById(req.params.id);
+  if (!kat) return res.sendStatus(404);
+
+  await moveToTrash('Kategori', kat);
+  await kat.deleteOne();
+
   res.sendStatus(204);
 });
 
@@ -71,8 +85,13 @@ app.post('/api/produk', checkAuth, async (req, res) => {
   await p.save();
   res.json(p);
 });
-app.delete('/api/produk/:id', checkAuth, async (req, res) => {
-  await Produk.findByIdAndDelete(req.params.id);
+app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
+  const kat = await Kategori.findById(req.params.id);
+  if (!kat) return res.sendStatus(404);
+
+  await moveToTrash('Kategori', kat);
+  await kat.deleteOne();
+
   res.sendStatus(204);
 });
 
@@ -85,8 +104,13 @@ app.post('/api/supplier',    checkAuth, async (req, res) => {
   await s.save();
   res.json(s);
 });
-app.delete('/api/supplier/:id', checkAuth, async (req, res) => {
-  await Supplier.findByIdAndDelete(req.params.id);
+app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
+  const kat = await Kategori.findById(req.params.id);
+  if (!kat) return res.sendStatus(404);
+
+  await moveToTrash('Kategori', kat);
+  await kat.deleteOne();
+
   res.sendStatus(204);
 });
 
@@ -179,6 +203,8 @@ app.get('/api/low-stock', checkAuth, async (req, res) => {
   });
   res.json(list);
 });
+
+
 
 // Start server
 const PORT = process.env.PORT || 3000;
