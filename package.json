@@ -13,6 +13,16 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "mongoose": "^8.15.2"
-  }
+    "mongoose": "^8.16.0"
+  },
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HikariReiziq/FinalProjectWebsiteSBD.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HikariReiziq/FinalProjectWebsiteSBD/issues"
+  },
+  "homepage": "https://github.com/HikariReiziq/FinalProjectWebsiteSBD#readme",
+  "devDependencies": {}
 }

@@ -1,4 +1,4 @@
-// server.js
+// server.js (Versi Final Lengkap dengan Perbaikan Edit & Delete)
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -29,6 +29,7 @@ const Pembelian          = require('./models/pembelian');
 const DetailPembelian    = require('./models/detailPembelian');
 const Trash = require('./models/trash');
 
+
 // Helper untuk memindahkan dokumen ke Trash
 async function moveToTrash(collectionName, doc) {
   const t = new Trash({
@@ -57,7 +58,7 @@ app.post('/api/login', (req, res) => {
   res.status(401).json({ success: false });
 });
 
-// CRUD Kategori
+// --- CRUD Kategori ---
 app.get('/api/kategori', checkAuth, async (req, res) => {
   res.json(await Kategori.find());
 });
@@ -69,14 +70,19 @@ app.post('/api/kategori', checkAuth, async (req, res) => {
 app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
   const kat = await Kategori.findById(req.params.id);
   if (!kat) return res.sendStatus(404);
-
   await moveToTrash('Kategori', kat);
   await kat.deleteOne();
-
   res.sendStatus(204);
 });
+// [DITAMBAHKAN] Rute Edit Kategori
+app.put('/api/kategori/:id', checkAuth, async (req, res) => {
+    const updatedKat = await Kategori.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedKat) return res.sendStatus(404);
+    res.json(updatedKat);
+});
 
-// CRUD Produk
+
+// --- CRUD Produk ---
 app.get('/api/produk', checkAuth, async (req, res) => {
   res.json(await Produk.find().populate('kategori'));
 });
@@ -85,15 +91,21 @@ app.post('/api/produk', checkAuth, async (req, res) => {
   await p.save();
   res.json(p);
 });
-app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
-  const kat = await Kategori.findById(req.params.id);
-  if (!kat) return res.sendStatus(404);
-
-  await moveToTrash('Kategori', kat);
-  await kat.deleteOne();
-
+// [DIPERBAIKI] Rute Delete Produk
+app.delete('/api/produk/:id', checkAuth, async (req, res) => {
+  const produk = await Produk.findById(req.params.id);
+  if (!produk) return res.sendStatus(404);
+  await moveToTrash('Produk', produk);
+  await produk.deleteOne();
   res.sendStatus(204);
 });
+// Rute Edit Produk
+app.put('/api/produk/:id', checkAuth, async (req, res) => {
+    const updatedProduk = await Produk.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate('kategori');
+    if (!updatedProduk) return res.sendStatus(404);
+    res.json(updatedProduk);
+});
+
 
 // --- CRUD Supplier ---
 app.get ('/api/supplier',    checkAuth, async (req, res) => {
@@ -104,48 +116,44 @@ app.post('/api/supplier',    checkAuth, async (req, res) => {
   await s.save();
   res.json(s);
 });
-app.delete('/api/kategori/:id', checkAuth, async (req, res) => {
-  const kat = await Kategori.findById(req.params.id);
-  if (!kat) return res.sendStatus(404);
-
-  await moveToTrash('Kategori', kat);
-  await kat.deleteOne();
-
+// [DIPERBAIKI] Rute Delete Supplier
+app.delete('/api/supplier/:id', checkAuth, async (req, res) => {
+  const supplier = await Supplier.findById(req.params.id);
+  if (!supplier) return res.sendStatus(404);
+  await moveToTrash('Supplier', supplier);
+  await supplier.deleteOne();
   res.sendStatus(204);
 });
+// [DITAMBAHKAN] Rute Edit Supplier
+app.put('/api/supplier/:id', checkAuth, async (req, res) => {
+    const updatedSupplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedSupplier) return res.sendStatus(404);
+    res.json(updatedSupplier);
+});
 
-// — Transaksi Penjualan —
+
+// --- Transaksi ---
 app.post('/api/penjualan', checkAuth, async (req, res) => {
-  const { pembeli, items } = req.body;
-  // buat header penjualan
-  let penjualan = new Penjualan({ pembeli, totalHarga: 0 });
+  const { pembeli, items, jenisPembayaran } = req.body;
+  let penjualan = new Penjualan({ pembeli, totalHarga: 0, jenisPembayaran });
   await penjualan.save();
-
   let grandTotal = 0;
   for (let it of items) {
     const prod = await Produk.findById(it.produk);
     if (!prod) continue;
     const sub = prod.harga * it.jumlah;
     grandTotal += sub;
-
-    // kurangi stok
     prod.stok = prod.stok - it.jumlah;
     await prod.save();
-
-    // simpan detail
     await new DetailPenjualan({
       penjualan: penjualan._id,
       produk:    it.produk,
       jumlah:    it.jumlah,
-      jenisPembayaran: it.jenisPembayaran,
       totalHarga: sub
     }).save();
   }
-
-  // update totalHarga di header
   penjualan.totalHarga = grandTotal;
   await penjualan.save();
-
   res.json({ success: true, penjualanId: penjualan._id });
 });
 
@@ -154,25 +162,18 @@ app.get('/api/penjualan', checkAuth, async (req, res) => {
   res.json(list);
 });
 
-// — Transaksi Pembelian —
 app.post('/api/pembelian', checkAuth, async (req, res) => {
   const { supplierId, items } = req.body;
-  // Header pembelian
   let pemb = new Pembelian({ supplier: supplierId, totalHarga: 0 });
   await pemb.save();
-
   let grandTotal = 0;
   for (let it of items) {
     const prod = await Produk.findById(it.produk);
     if (!prod) continue;
     const sub = it.hargaBeliSatuan * it.jumlah;
     grandTotal += sub;
-
-    // tambah stok
     prod.stok = prod.stok + it.jumlah;
     await prod.save();
-
-    // simpan detail
     await new DetailPembelian({
       pembelian:       pemb._id,
       produk:          it.produk,
@@ -181,11 +182,8 @@ app.post('/api/pembelian', checkAuth, async (req, res) => {
       subtotal:        sub
     }).save();
   }
-
-  // update totalHarga
   pemb.totalHarga = grandTotal;
   await pemb.save();
-
   res.json({ success: true, pembelianId: pemb._id });
 });
 
@@ -196,7 +194,6 @@ app.get('/api/pembelian', checkAuth, async (req, res) => {
   res.json(list);
 });
 
-// Alert stok menipis (perbaikan)
 app.get('/api/low-stock', checkAuth, async (req, res) => {
   const list = await Produk.find({
     $expr: { $lte: ['$stok', '$stokMinimum'] }
@@ -204,7 +201,48 @@ app.get('/api/low-stock', checkAuth, async (req, res) => {
   res.json(list);
 });
 
+// --- ENDPOINT LAPORAN PEMBELIAN ---
+app.get('/api/laporan/pembelian', checkAuth, async (req, res) => {
+  const pembelianList = await Pembelian.find().populate('supplier').sort('-tanggal');
+  const detailList = await DetailPembelian.find().populate('produk pembelian');
+  const laporan = pembelianList.map((pembelian) => {
+    const details = detailList.filter(d => String(d.pembelian._id) === String(pembelian._id));
+    return {
+      tanggal: pembelian.tanggal,
+      supplier: pembelian.supplier ? pembelian.supplier.nama : "-",
+      totalPembelian: pembelian.totalHarga,
+      detail: details.map(d => ({
+        namaProduk: d.produk ? d.produk.nama : "-",
+        jumlah: d.jumlah,
+        hargaSatuan: d.hargaBeliSatuan,
+        subtotal: d.subtotal,
+      }))
+    }
+  });
+  res.json(laporan);
+});
 
+// --- ENDPOINT LAPORAN PENJUALAN ---
+app.get('/api/laporan/penjualan', checkAuth, async (req, res) => {
+  const penjualanList = await Penjualan.find().sort('-tanggal');
+  const detailList = await DetailPenjualan.find().populate('produk penjualan');
+  const laporan = penjualanList.map((penjualan) => {
+    const details = detailList.filter(d => String(d.penjualan._id) === String(penjualan._id));
+    return {
+      tanggal: penjualan.tanggal,
+      pembeli: penjualan.pembeli,
+      totalPenjualan: penjualan.totalHarga,
+      detail: details.map(d => ({
+        namaProduk: d.produk ? d.produk.nama : "-",
+        jumlah: d.jumlah,
+        // tambahkan jenisPembayaran jika field tersedia di DetailPenjualan
+        hargaJual: d.totalHarga / d.jumlah,
+        totalPerProduk: d.totalHarga,
+      }))
+    }
+  });
+  res.json(laporan);
+});
 
 // Start server
 const PORT = process.env.PORT || 3000;
